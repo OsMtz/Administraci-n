@@ -1,0 +1,21 @@
+.header{
+  border:2px solid black;
+  padding: 10px;
+}
+
+.container{
+  display:flex;
+  height:cal(100vh - 60px);
+}
+
+.sidebar{
+  width:220px;
+  border:2px solid black;
+  padding: 10px;
+}
+
+.content{
+  flex:1;
+  border:2px solid black;
+  padding: 20px;
+}
