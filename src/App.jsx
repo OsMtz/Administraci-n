@@ -6,6 +6,8 @@ import Dashboard from './pages/Dashboard'
 import Expediente from './pages/Expediente'
 import Login from './pages/Login'
 import Pacientes from './pages/Pacientes'
+import Register from "./pages/Register"
+
 
 export default function App() {
   return (
@@ -13,6 +15,7 @@ export default function App() {
       <Routes>
 
         <Route path="/" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
         <Route element={<MainLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />

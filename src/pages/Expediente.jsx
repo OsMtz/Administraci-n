@@ -1,24 +1,25 @@
 export default function Expediente() {
   return (
-    <div>
-      <h2>Expediente del Paciente</h2>
+    <>
+      <h2>Juan Pérez</h2>
 
-      <p>Nombre: Juan Pérez</p>
-      <p>Edad: 30</p>
+      <div className="expediente-info">
+        <p><span>Edad:</span> 30 años</p>
+        <p><span>Género:</span> Masculino</p>
+        <p><span>DNI:</span> 48333425</p>
+      </div>
 
       <label>Diagnóstico</label>
-      <br />
-      <textarea rows="4"></textarea>
-
-      <br /><br />
+      <input type="text" />
 
       <label>Observaciones</label>
-      <br />
       <textarea rows="4"></textarea>
 
-      <br /><br />
-
       <button>Guardar</button>
-    </div>
+
+      <div className="alert-success">
+        Expediente actualizado exitosamente
+      </div>
+    </>
   )
 }

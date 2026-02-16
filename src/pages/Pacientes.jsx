@@ -1,27 +1,37 @@
 export default function Pacientes() {
   return (
-    <div>
+    <>
       <h2>Gestión de Pacientes</h2>
 
-      <input type="text" placeholder="Buscar paciente" />
-      <button>Agregar Paciente</button>
+      <div className="section-header">
+        <input type="text" placeholder="Buscar paciente..." />
+        <button>+ Agregar Paciente</button>
+      </div>
 
-      <br /><br />
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>DNI</th>
+              <th>Teléfono</th>
+              <th>Expediente</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Juan Pérez</td>
+              <td>48333425</td>
+              <td>88333425</td>
+              <td><button>Ver</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-      <table border="1" width="100%">
-        <tr>
-          <th>Nombre</th>
-          <th>DNI</th>
-          <th>Teléfono</th>
-          <th>Acción</th>
-        </tr>
-        <tr>
-          <td>Juan Pérez</td>
-          <td>12345678</td>
-          <td>555-1234</td>
-          <td><button>Ver</button></td>
-        </tr>
-      </table>
-    </div>
+      <div className="alert-success">
+        Paciente registrado exitosamente
+      </div>
+    </>
   )
 }

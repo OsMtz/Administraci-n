@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
+
 
 export default function Sidebar(){
     return(
@@ -6,16 +7,16 @@ export default function Sidebar(){
             <nav>
                 <ul>
                     <li>
-                        <Link to="/dashboard">Inicio</Link>
+                        <NavLink to="/dashboard">Inicio</NavLink>
                     </li>
                     <li>
-                       <Link to="/pacientes">Pacientes</Link> 
+                       <NavLink to="/pacientes">Pacientes</NavLink> 
                     </li>
                      <li>
-                       <Link to="/expediente">Expedientes</Link> 
+                       <NavLink to="/expediente">Expedientes</NavLink> 
                     </li>
                      <li>
-                       <Link to="/admin">Admin</Link> 
+                       <NavLink to="/admin">Admin</NavLink> 
                     </li>
                 </ul>
             </nav>

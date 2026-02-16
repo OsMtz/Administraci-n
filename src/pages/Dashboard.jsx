@@ -1,28 +1,58 @@
 export default function Dashboard() {
   return (
-    <div>
-      <h2>Bienvenido, Doctor</h2>
+    <>
+      <h2 className="dashboard-title">
+        Bienvenido, Dr. Juan Pérez
+      </h2>
 
-      <section>
+      <div className="card">
+
         <h3>Citas del Día</h3>
 
-        <table border="1" width="100%">
+        <table>
           <thead>
             <tr>
-              <th>Hora</th>
+              <th>Horario</th>
               <th>Paciente</th>
-              <th>Médico</th>
+              <th>Doctor</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>10:00</td>
+              <td>10:00 AM</td>
               <td>Juan Pérez</td>
               <td>Dr. Pérez</td>
             </tr>
+            <tr>
+              <td>11:00 AM</td>
+              <td>María Gómez</td>
+              <td>Dr. González</td>
+            </tr>
+            <tr>
+              <td>1:00 PM</td>
+              <td>Carlos Sánchez</td>
+              <td>Dr. Martínez</td>
+            </tr>
           </tbody>
         </table>
-      </section>
-    </div>
-  )
+
+      </div>
+
+      <div className="dashboard-grid">
+
+        <div className="dashboard-box box-pacientes">
+          Pacientes
+        </div>
+
+        <div className="dashboard-box box-citas">
+          Citas
+        </div>
+
+        <div className="dashboard-box box-facturacion">
+          Facturación
+        </div>
+
+      </div>
+    </>
+  );
 }
