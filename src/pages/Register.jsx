@@ -1,91 +1,68 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-export default function Register() {
-
+const Register = () => {
+  const [formData, setFormData] = useState({ username: '', password: '', email: '' });
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const [usuario, setUsuario] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmar, setConfirmar] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
-  const handleRegister = (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-
-    if (!usuario || !email || !password || !confirmar) {
-      setError("Todos los campos son obligatorios");
-      setSuccess("");
+    const users = JSON.parse(localStorage.getItem('users') || '[]');
+    if (users.find(user => user.username === formData.username || user.email === formData.email)) {
+      setError('Usuario o email ya existe');
       return;
     }
-
-    if (password !== confirmar) {
-      setError("Las contraseñas no coinciden");
-      setSuccess("");
-      return;
-    }
-
-    setError("");
-    setSuccess("Registro exitoso");
-
-    setTimeout(() => {
-      navigate("/");
-    }, 1500);
+    const newUser = { ...formData, id: Date.now(), role: 'user' };
+    users.push(newUser);
+    localStorage.setItem('users', JSON.stringify(users));
+    alert('Registro exitoso. Ahora puedes iniciar sesión.');
+    navigate('/');
   };
 
   return (
     <div className="login-wrapper">
       <div className="login-card">
-
         <h2>Registro de Usuario</h2>
-
-        <form onSubmit={handleRegister}>
-
+        <form onSubmit={handleSubmit}>
           <input
             type="text"
+            name="username"
             placeholder="Usuario"
-            value={usuario}
-            onChange={(e) => setUsuario(e.target.value)}
+            value={formData.username}
+            onChange={handleChange}
+            required
           />
-
           <input
             type="email"
+            name="email"
             placeholder="Correo electrónico"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={formData.email}
+            onChange={handleChange}
+            required
           />
-
           <input
             type="password"
+            name="password"
             placeholder="Contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={formData.password}
+            onChange={handleChange}
+            required
           />
-
-          <input
-            type="password"
-            placeholder="Confirmar contraseña"
-            value={confirmar}
-            onChange={(e) => setConfirmar(e.target.value)}
-          />
-
           <button type="submit">Registrarse</button>
-
         </form>
-
         {error && <div className="alert-error">{error}</div>}
-        {success && <div className="alert-success">{success}</div>}
-
         <p className="register-text">
-          ¿Ya tienes cuenta?{" "}
-          <span onClick={() => navigate("/")}>
-            Inicia sesión
-          </span>
+          ¿Ya tienes cuenta?{' '}
+          <span onClick={() => navigate('/')}>Inicia sesión</span>
         </p>
-
       </div>
     </div>
   );
-}
+};
+
+export default Register;
