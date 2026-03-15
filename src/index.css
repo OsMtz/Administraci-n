@@ -36,6 +36,9 @@ body {
   background: linear-gradient(to bottom, #e9eef5, #dbe4ef);
   padding: 20px 10px;
   border-right: 1px solid #cfd8e3;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar ul {
@@ -269,4 +272,119 @@ tr:hover {
   color: #2c7be5;
   cursor: pointer;
   font-weight: 600;
+}
+.password-container {
+  position: relative;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 10px;
+  top: 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #2c7be5;
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+/* Reemplaza tus td:contains por esto */
+.status-confirmada { color: #16a085; font-weight: 600; }
+.status-pendiente { color: #f39c12; font-weight: 600; }
+.status-completada { color: #2c7be5; font-weight: 600; }
+
+/* ================= MODAL ================= */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal {
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  width: 400px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.modal h3 {
+  margin-bottom: 15px;
+}
+
+.modal input {
+  margin-bottom: 12px;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: space-between;
+}
+/* Añadir al final de index.css */
+.search-container {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.search-input {
+  flex: 1; /* Para que ocupe todo el espacio */
+  margin-top: 0; /* Quitar el margin que tienen tus inputs generales */
+}
+
+.btn-open {
+  background: #2c7be5;
+  margin-top: 0; /* Alineado con el texto */
+  padding: 8px 15px;
+}
+/* ================= EXPEDIENTE DETALLE (PUNTO 3) ================= */
+
+/* Contenedor principal para separar info fija de consulta */
+.expediente-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr; /* Columna izquierda fija, derecha flexible */
+  gap: 25px;
+  margin-top: 20px;
+}
+
+/* Cajitas de información rápida para M. y J. */
+.info-box {
+  background-color: #f8fbfd; /* Color acorde a tu Reset */
+  padding: 18px;
+  border-radius: 8px;
+  border-left: 5px solid #2c7be5; /* El azul de tu Header */
+  margin-bottom: 15px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+}
+
+.info-box span {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #7f8c8d;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.info-box p {
+  font-weight: 600;
+  font-size: 16px;
+  color: #2c3e50;
+}
+
+/* Ajuste para que los botones de "Guardar" no queden gigantes */
+.btn-save {
+  width: auto; 
+  padding: 10px 30px;
 }

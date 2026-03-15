@@ -1,52 +1,80 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login, user } = useAuth();
+
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => { if (user) { if (user.role === 'Admin') navigate('/admin'); 
+    else navigate('/dashboard'); } }, [user, navigate]);
 
   const handleLogin = (e) => {
     e.preventDefault();
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    if (users.length === 0) {
-      setError("No hay usuarios registrados. Regístrate primero.");
+    if (!usuario.trim() || !password.trim()) {
+      setError("Debe ingresar usuario y contraseña");
       return;
     }
-    const user = users.find(u => u.username === usuario && u.password === password);
-    if (user) {
-      localStorage.setItem('currentUser', JSON.stringify(user));
-      navigate("/dashboard");
-    } else {
-      setError("Usuario o contraseña incorrectos");
-    }
+    setError("");
+    setLoading(true);
+    fetch('http://localhost:5000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario, password })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.token) {
+          login({ ...data.user, token: data.token });
+        } else {
+          setError(data.message || 'Usuario o contraseña incorrectos');
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        setError('Error de conexión');
+        setLoading(false);
+      });
   };
 
   return (
     <div className="login-wrapper">
       <div className="login-card">
-        <h2>Inicio de Sesión</h2>
+        <h2>ClínicaMed - Acceso</h2>
         <form onSubmit={handleLogin}>
           <input
             type="text"
-            placeholder="Usuario"
+            placeholder="Usuario (Ejemplo: admin)"
             value={usuario}
             onChange={(e) => setUsuario(e.target.value)}
           />
-          <input
-            type="password"
-            placeholder="Contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <button type="submit">Iniciar Sesión</button>
+
+          <div className="password-container">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <span
+              className="toggle-password"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? "Ocultar" : "Mostrar"}
+            </span>
+          </div>
+
+          <button type="submit" disabled={loading}>
+            {loading ? "Ingresando..." : "Iniciar Sesión"}
+          </button>
         </form>
         {error && <div className="alert-error">{error}</div>}
-        <p className="register-text">
-          ¿No estás registrado?{" "}
-          <span onClick={() => navigate("/register")}>Regístrate aquí</span>
-        </p>
       </div>
     </div>
   );
