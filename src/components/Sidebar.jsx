@@ -49,6 +49,16 @@ export default function Sidebar() {
               Pacientes
             </NavLink>
           </li>
+          {user?.role === 'Secretaria' && (
+            <li>
+              <NavLink
+                to="/pagos"
+                className={({ isActive }) => (isActive ? "active" : "")}
+              >
+                Pagos
+              </NavLink>
+            </li>
+          )}
           <li>
             <NavLink
               to="/expedientes"

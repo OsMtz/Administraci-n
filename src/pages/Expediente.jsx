@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 
 const API_BASE = "http://localhost:5000/api";
 
+
 export default function Expediente() {
   const { id } = useParams(); // id_paciente
   const navigate = useNavigate();
@@ -17,11 +18,14 @@ export default function Expediente() {
   }, [token]);
 
   // En backend los roles validos son: Admin | Medico | Secretaria
-  const puedeEditar = user?.role === "Medico" || user?.role === "Admin";
+  // Regla: solo Medico puede realizar entradas medicas.
+  const puedeEditar = user?.role === "Medico";
 
   const [paciente, setPaciente] = useState(null);
   const [expediente, setExpediente] = useState(null); // { historial: [] ... } | null
   const [citas, setCitas] = useState([]);
+  const [pagosFacturacion, setPagosFacturacion] = useState([]);
+  const [pagosError, setPagosError] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
@@ -34,8 +38,9 @@ export default function Expediente() {
     if (!token) return;
     setLoading(true);
     setError("");
+    setPagosError("");
 
-    Promise.all([
+    const baseFetches = [
       fetch(`${API_BASE}/pacientes/${id}`, { headers: authHeaders }).then((res) =>
         res.json().then((data) => ({ ok: res.ok, data }))
       ),
@@ -45,14 +50,37 @@ export default function Expediente() {
       fetch(`${API_BASE}/citas/paciente/${id}`, { headers: authHeaders }).then((res) =>
         res.json().then((data) => ({ ok: res.ok, data }))
       ),
-    ])
-      .then(([pRes, eRes, cRes]) => {
+    ];
+
+    const extraFetches =
+      user?.role === "Admin"
+        ? [
+            fetch(`${API_BASE}/pagos/paciente/${id}`, { headers: authHeaders }).then((res) =>
+              res.json().then((data) => ({ ok: res.ok, data }))
+            ),
+          ]
+        : [];
+
+    Promise.all([...baseFetches, ...extraFetches])
+      .then((results) => {
+        const [pRes, eRes, cRes, pagosRes] = results;
         if (!pRes.ok) throw new Error(pRes.data?.message || "No se pudo cargar el paciente");
         if (!eRes.ok) throw new Error(eRes.data?.message || "No se pudo cargar el expediente");
         if (!cRes.ok) throw new Error(cRes.data?.message || "No se pudieron cargar las citas");
         setPaciente(pRes.data);
         setExpediente(eRes.data); // puede ser null si aun no existe
         setCitas(Array.isArray(cRes.data) ? cRes.data : []);
+
+        if (user?.role === "Admin") {
+          if (pagosRes?.ok) {
+            setPagosFacturacion(Array.isArray(pagosRes.data) ? pagosRes.data : []);
+          } else {
+            setPagosFacturacion([]);
+            setPagosError(pagosRes?.data?.message || "No se pudieron cargar pagos/facturacion");
+          }
+        } else {
+          setPagosFacturacion([]);
+        }
       })
       .catch((e) => setError(e.message || "Error cargando expediente"))
       .finally(() => setLoading(false));
@@ -99,9 +127,15 @@ export default function Expediente() {
     <div className="expediente-container">
       <div className="header-flex">
         <h2>Expediente Clinico de {nombreCompleto || `Paciente #${id}`}</h2>
-        <button className="btn-back" onClick={() => navigate("/pacientes")} disabled={loading}>
-          Volver a Lista
-        </button>
+        {user?.role === "Admin" ? (
+          <button className="btn-back" onClick={() => navigate("/expedientes-admin")} disabled={loading}>
+            Volver a Expedientes
+          </button>
+        ) : (
+          <button className="btn-back" onClick={() => navigate("/pacientes")} disabled={loading}>
+            Volver a Lista
+          </button>
+        )}
       </div>
 
       {error && (
@@ -125,49 +159,43 @@ export default function Expediente() {
           </p>
         </section>
 
-        <section className="card consulta-actual">
-          <h3>Nueva Entrada Medica</h3>
+        {user?.role === "Medico" && (
+          <section className="card consulta-actual">
+            <h3>Nueva Entrada Medica</h3>
 
-          {!puedeEditar && (
-            <p style={{ color: "#e67e22", fontSize: "13px", marginBottom: "10px" }}>
-              Modo lectura: solo Medico/Admin puede guardar entradas.
-            </p>
-          )}
+            <label>Diagnostico</label>
+            <input
+              type="text"
+              value={diagnostico}
+              onChange={(e) => setDiagnostico(e.target.value)}
+              placeholder="Ej: Gripe estacional"
+              disabled={loading}
+            />
 
-          <label>Diagnostico</label>
-          <input
-            type="text"
-            value={diagnostico}
-            onChange={(e) => setDiagnostico(e.target.value)}
-            placeholder={puedeEditar ? "Ej: Gripe estacional" : "Sin permisos de edicion"}
-            disabled={!puedeEditar || loading}
-          />
+            <label>Observaciones Clinicas</label>
+            <textarea
+              rows="3"
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              disabled={loading}
+            />
 
-          <label>Observaciones Clinicas</label>
-          <textarea
-            rows="3"
-            value={observaciones}
-            onChange={(e) => setObservaciones(e.target.value)}
-            disabled={!puedeEditar || loading}
-          />
+            <label>Plan de Tratamiento (Receta)</label>
+            <textarea
+              rows="3"
+              value={tratamiento}
+              onChange={(e) => setTratamiento(e.target.value)}
+              placeholder="Medicamentos y dosis..."
+              disabled={loading}
+            />
 
-          <label>Plan de Tratamiento (Receta)</label>
-          <textarea
-            rows="3"
-            value={tratamiento}
-            onChange={(e) => setTratamiento(e.target.value)}
-            placeholder={puedeEditar ? "Medicamentos y dosis..." : "Sin permisos de edicion"}
-            disabled={!puedeEditar || loading}
-          />
-
-          {puedeEditar && (
             <button className="btn-save" onClick={handleGuardar} disabled={loading}>
               Guardar Evolucion
             </button>
-          )}
 
-          {mensaje && <p className="status-msg">{mensaje}</p>}
-        </section>
+            {mensaje && <p className="status-msg">{mensaje}</p>}
+          </section>
+        )}
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
@@ -230,6 +258,51 @@ export default function Expediente() {
           <p style={{ margin: 0, color: "#666" }}>Este paciente no tiene citas registradas.</p>
         )}
       </div>
+
+      {user?.role === "Admin" && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <h3>Pagos y Facturacion</h3>
+          {pagosError && (
+            <div className="alert-error" style={{ marginBottom: 12 }}>
+              {pagosError}
+            </div>
+          )}
+          {Array.isArray(pagosFacturacion) && pagosFacturacion.length > 0 ? (
+            <table>
+              <thead>
+                <tr>
+                  <th>Factura</th>
+                  <th>Fecha emision</th>
+                  <th>Monto total</th>
+                  <th>Cita</th>
+                  <th>Medico</th>
+                  <th>Pago</th>
+                  <th>Fecha pago</th>
+                  <th>Metodo</th>
+                  <th>Notas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagosFacturacion.map((r, idx) => (
+                  <tr key={`${r.id_factura}-${r.id_pago || "x"}-${idx}`}>
+                    <td>#{r.id_factura}</td>
+                    <td>{r.fecha_emision || "-"}</td>
+                    <td>{r.monto_total ?? "-"}</td>
+                    <td>{r.id_cita ?? "-"}</td>
+                    <td>{r.medico_id ?? "-"}</td>
+                    <td>{r.pago_monto ?? "-"}</td>
+                    <td>{r.fecha_pago || "-"}</td>
+                    <td>{r.metodo_pago || "-"}</td>
+                    <td>{r.notas || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p style={{ margin: 0, color: "#666" }}>Aun no hay pagos/facturas registrados para este paciente.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

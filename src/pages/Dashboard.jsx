@@ -114,6 +114,11 @@ export default function Dashboard() {
               Organizar Citas
             </button>
           )}
+          {esSecretaria && (
+            <button onClick={() => navigate("/pagos")} style={{ marginTop: 0 }}>
+              Pagos
+            </button>
+          )}
         </div>
       </div>
 

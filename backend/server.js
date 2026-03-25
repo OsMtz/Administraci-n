@@ -30,6 +30,28 @@ const dbQuery = (sql, params = []) =>
     });
   });
 
+const dbGetConnection = () =>
+  new Promise((resolve, reject) => {
+    db.getConnection((err, conn) => {
+      if (err) return reject(err);
+      resolve(conn);
+    });
+  });
+
+const connQuery = (conn, sql, params = []) =>
+  new Promise((resolve, reject) => {
+    conn.query(sql, params, (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
+  });
+
+const connBegin = (conn) =>
+  new Promise((resolve, reject) => conn.beginTransaction((err) => (err ? reject(err) : resolve())));
+const connCommit = (conn) => new Promise((resolve, reject) => conn.commit((err) => (err ? reject(err) : resolve())));
+const connRollback = (conn) =>
+  new Promise((resolve) => conn.rollback(() => resolve())); // rollback no debe reventar el handler
+
 // ======== AUTH HELPERS ========
 const verifyToken = (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -82,6 +104,14 @@ const assertPacienteOwnership = async (req, idPaciente) => {
 };
 
 // ======== BOOTSTRAP ========
+const todayISO = () => {
+  try {
+    return new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD (local)
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+};
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const waitForDb = async (retries = 25, delayMs = 1200) => {
@@ -473,6 +503,182 @@ app.get('/api/admin/medicos/:id/pacientes', verifyToken, requireRole('Admin'), a
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error de base de datos (admin pacientes por medico)' });
+  }
+});
+
+// ======== ADMIN: FACTURAS / PAGOS ========
+// Lista de facturas con pagos asociados (para guardar/imprimir en el panel de Expedientes).
+app.get('/api/admin/facturas', verifyToken, requireRole('Admin'), async (req, res) => {
+  const { from = null, to = null, limit = 300 } = req.query || {};
+  try {
+    const params = [];
+    let where = '1=1';
+    if (from) {
+      where += ' AND f.fecha_emision >= ?';
+      params.push(from);
+    }
+    if (to) {
+      where += ' AND f.fecha_emision <= ?';
+      params.push(to);
+    }
+
+    const lim = Math.max(1, Math.min(Number(limit) || 300, 2000));
+
+    let rows = [];
+    try {
+      // Query extendido (si existen columnas extra en facturacion: id_cita, id_usuario, notas)
+      rows = await dbQuery(
+        `
+        SELECT
+          f.id_factura,
+          f.id_paciente,
+          f.monto_total,
+          f.fecha_emision,
+          f.id_cita,
+          f.id_usuario AS medico_id,
+          f.notas,
+          pa.nombre AS paciente_nombre,
+          pa.apellido AS paciente_apellido,
+          pa.dni AS paciente_dni,
+          pg.id_pago,
+          pg.monto AS pago_monto,
+          pg.fecha_pago,
+          pg.metodo_pago,
+          c.fecha AS cita_fecha,
+          c.hora AS cita_hora,
+          mu.username AS medico_usuario
+        FROM facturacion f
+        LEFT JOIN pacientes pa ON pa.id_paciente = f.id_paciente
+        LEFT JOIN pagos pg ON pg.id_factura = f.id_factura
+        LEFT JOIN citas c ON c.id_cita = f.id_cita
+        LEFT JOIN usuarios mu ON mu.id_usuario = COALESCE(f.id_usuario, c.id_usuario)
+        WHERE ${where}
+        ORDER BY f.id_factura DESC, pg.id_pago DESC
+        LIMIT ?
+        `,
+        [...params, lim]
+      );
+    } catch (e) {
+      // Fallback base (sin columnas extra)
+      if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+        rows = await dbQuery(
+          `
+          SELECT
+            f.id_factura,
+            f.id_paciente,
+            f.monto_total,
+            f.fecha_emision,
+            pa.nombre AS paciente_nombre,
+            pa.apellido AS paciente_apellido,
+            pa.dni AS paciente_dni,
+            pg.id_pago,
+            pg.monto AS pago_monto,
+            pg.fecha_pago,
+            pg.metodo_pago
+          FROM facturacion f
+          LEFT JOIN pacientes pa ON pa.id_paciente = f.id_paciente
+          LEFT JOIN pagos pg ON pg.id_factura = f.id_factura
+          WHERE ${where}
+          ORDER BY f.id_factura DESC, pg.id_pago DESC
+          LIMIT ?
+          `,
+          [...params, lim]
+        );
+      } else {
+        throw e;
+      }
+    }
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    if (err && err.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        message:
+          'Faltan tablas pagos/facturacion en MySQL. Importa los scripts hospital_db_facturacion.sql y hospital_db_pagos.sql (o el dump completo) en tu base.'
+      });
+    }
+    res.status(500).json({ message: 'Error de base de datos (admin facturas)' });
+  }
+});
+
+app.get('/api/admin/facturas/:id_factura', verifyToken, requireRole('Admin'), async (req, res) => {
+  const idFactura = req.params.id_factura;
+  try {
+    let rows = [];
+    try {
+      rows = await dbQuery(
+        `
+        SELECT
+          f.id_factura,
+          f.id_paciente,
+          f.monto_total,
+          f.fecha_emision,
+          f.id_cita,
+          f.id_usuario AS medico_id,
+          f.notas,
+          pa.nombre AS paciente_nombre,
+          pa.apellido AS paciente_apellido,
+          pa.dni AS paciente_dni,
+          pg.id_pago,
+          pg.monto AS pago_monto,
+          pg.fecha_pago,
+          pg.metodo_pago,
+          c.fecha AS cita_fecha,
+          c.hora AS cita_hora,
+          mu.username AS medico_usuario
+        FROM facturacion f
+        LEFT JOIN pacientes pa ON pa.id_paciente = f.id_paciente
+        LEFT JOIN pagos pg ON pg.id_factura = f.id_factura
+        LEFT JOIN citas c ON c.id_cita = f.id_cita
+        LEFT JOIN usuarios mu ON mu.id_usuario = COALESCE(f.id_usuario, c.id_usuario)
+        WHERE f.id_factura = ?
+        ORDER BY pg.id_pago DESC
+        LIMIT 50
+        `,
+        [idFactura]
+      );
+    } catch (e) {
+      if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+        rows = await dbQuery(
+          `
+          SELECT
+            f.id_factura,
+            f.id_paciente,
+            f.monto_total,
+            f.fecha_emision,
+            pa.nombre AS paciente_nombre,
+            pa.apellido AS paciente_apellido,
+            pa.dni AS paciente_dni,
+            pg.id_pago,
+            pg.monto AS pago_monto,
+            pg.fecha_pago,
+            pg.metodo_pago
+          FROM facturacion f
+          LEFT JOIN pacientes pa ON pa.id_paciente = f.id_paciente
+          LEFT JOIN pagos pg ON pg.id_factura = f.id_factura
+          WHERE f.id_factura = ?
+          ORDER BY pg.id_pago DESC
+          LIMIT 50
+          `,
+          [idFactura]
+        );
+      } else {
+        throw e;
+      }
+    }
+
+    if (!rows.length) return res.status(404).json({ message: 'Factura no encontrada' });
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    if (err && err.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        message:
+          'Faltan tablas pagos/facturacion en MySQL. Importa los scripts hospital_db_facturacion.sql y hospital_db_pagos.sql (o el dump completo) en tu base.'
+      });
+    }
+    res.status(500).json({ message: 'Error de base de datos (admin factura detalle)' });
   }
 });
 
@@ -888,6 +1094,232 @@ app.post('/api/citas', verifyToken, requireRole(['Secretaria', 'Medico', 'Admin'
       });
     }
     res.status(500).json({ message: 'Error de base de datos (crear cita)' });
+  }
+});
+
+// ======== PAGOS / FACTURACION ========
+// Tablas:
+// - facturacion(id_factura, id_paciente, monto_total, fecha_emision)
+// - pagos(id_pago, id_factura, monto, fecha_pago, metodo_pago)
+//
+// Nota: La secretaria genera pagos/facturas. El Admin puede consultar en expediente.
+app.post('/api/pagos/facturar', verifyToken, requireRole(['Secretaria', 'Admin']), async (req, res) => {
+  const {
+    id_paciente,
+    id_cita = null,
+    monto,
+    metodo_pago,
+    fecha_pago = null,
+    notas = null
+  } = req.body || {};
+
+  if (!id_paciente) return res.status(400).json({ message: 'id_paciente es obligatorio' });
+  if (monto === undefined || monto === null || String(monto).trim() === '') {
+    return res.status(400).json({ message: 'monto es obligatorio' });
+  }
+  if (!metodo_pago) return res.status(400).json({ message: 'metodo_pago es obligatorio' });
+
+  const montoNum = Number(monto);
+  if (!Number.isFinite(montoNum) || montoNum <= 0) {
+    return res.status(400).json({ message: 'monto invalido' });
+  }
+
+  const fechaPagoISO = fecha_pago || todayISO();
+
+  let conn;
+  try {
+    // Medico no puede facturar; pero si algun dia se habilita, respetamos ownership.
+    await assertPacienteOwnership(req, id_paciente);
+
+    conn = await dbGetConnection();
+    await connBegin(conn);
+
+    let citaDb = null;
+    if (id_cita) {
+      const citaRows = await connQuery(
+        conn,
+        `
+        SELECT c.id_cita, c.id_usuario AS medico_id, c.fecha, c.hora
+        FROM citas c
+        WHERE c.id_cita = ?
+        `,
+        [id_cita]
+      );
+      citaDb = citaRows[0] || null;
+    }
+
+    // Insert flexible: si el usuario aplico una migracion para guardar id_cita/id_usuario/notas, las usamos.
+    let facturaRes;
+    try {
+      if (id_cita || citaDb?.medico_id || notas) {
+        facturaRes = await connQuery(
+          conn,
+          'INSERT INTO facturacion (id_paciente, monto_total, fecha_emision, id_cita, id_usuario, notas) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            id_paciente,
+            montoNum,
+            fechaPagoISO,
+            id_cita ? Number(id_cita) : null,
+            citaDb?.medico_id ? Number(citaDb.medico_id) : null,
+            notas ? String(notas) : null
+          ]
+        );
+      } else {
+        facturaRes = await connQuery(conn, 'INSERT INTO facturacion (id_paciente, monto_total, fecha_emision) VALUES (?, ?, ?)', [
+          id_paciente,
+          montoNum,
+          fechaPagoISO
+        ]);
+      }
+    } catch (e) {
+      // Si no existen columnas extra, reintenta insert base.
+      if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+        facturaRes = await connQuery(conn, 'INSERT INTO facturacion (id_paciente, monto_total, fecha_emision) VALUES (?, ?, ?)', [
+          id_paciente,
+          montoNum,
+          fechaPagoISO
+        ]);
+      } else {
+        throw e;
+      }
+    }
+    const id_factura = facturaRes.insertId;
+
+    const pagoRes = await connQuery(
+      conn,
+      'INSERT INTO pagos (id_factura, monto, fecha_pago, metodo_pago) VALUES (?, ?, ?, ?)',
+      [id_factura, montoNum, fechaPagoISO, String(metodo_pago)]
+    );
+    const id_pago = pagoRes.insertId;
+
+    if (id_cita) await connQuery(conn, 'UPDATE citas SET estado = ? WHERE id_cita = ?', ['Pagada', id_cita]);
+
+    await connCommit(conn);
+
+    const pacienteRows = await dbQuery('SELECT id_paciente, nombre, apellido, dni FROM pacientes WHERE id_paciente = ?', [
+      id_paciente
+    ]);
+    const paciente = pacienteRows[0] || null;
+
+    let cita = null;
+    if (id_cita) {
+      const citaRows = await dbQuery(
+        `
+        SELECT
+          c.id_cita,
+          c.fecha,
+          c.hora,
+          c.estado,
+          u.id_usuario AS medico_id,
+          u.username AS medico_usuario
+        FROM citas c
+        LEFT JOIN usuarios u ON u.id_usuario = c.id_usuario
+        WHERE c.id_cita = ?
+        `,
+        [id_cita]
+      );
+      cita = citaRows[0] || null;
+    }
+
+    res.status(201).json({
+      id_factura,
+      id_pago,
+      id_paciente: Number(id_paciente),
+      id_cita: id_cita ? Number(id_cita) : null,
+      medico_id: citaDb?.medico_id ? Number(citaDb.medico_id) : cita?.medico_id ? Number(cita.medico_id) : null,
+      notas: notas ? String(notas) : null,
+      monto: montoNum,
+      metodo_pago: String(metodo_pago),
+      fecha_pago: fechaPagoISO,
+      paciente,
+      cita
+    });
+  } catch (err) {
+    console.error(err);
+    if (conn) await connRollback(conn);
+    const msg = err?.message || 'Error de base de datos (facturar)';
+    if (err?.status) return res.status(err.status).json({ message: msg });
+    if (err && err.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        message:
+          'Faltan tablas pagos/facturacion en MySQL. Importa los scripts hospital_db_facturacion.sql y hospital_db_pagos.sql (o el dump completo) en tu base.'
+      });
+    }
+    res.status(500).json({ message: msg });
+  } finally {
+    try {
+      conn?.release?.();
+    } catch {
+      // ignore
+    }
+  }
+});
+
+app.get('/api/pagos/paciente/:id_paciente', verifyToken, requireRole(['Secretaria', 'Medico', 'Admin']), async (req, res) => {
+  const idPaciente = req.params.id_paciente;
+  try {
+    await assertPacienteOwnership(req, idPaciente);
+
+    let rows = [];
+    try {
+      rows = await dbQuery(
+        `
+        SELECT
+          f.id_factura,
+          f.id_paciente,
+          f.monto_total,
+          f.fecha_emision,
+          f.id_cita,
+          f.id_usuario AS medico_id,
+          f.notas,
+          p.id_pago,
+          p.monto AS pago_monto,
+          p.fecha_pago,
+          p.metodo_pago
+        FROM facturacion f
+        LEFT JOIN pagos p ON p.id_factura = f.id_factura
+        WHERE f.id_paciente = ?
+        ORDER BY f.id_factura DESC, p.id_pago DESC
+        `,
+        [idPaciente]
+      );
+    } catch (e) {
+      // Fallback si aun no hay columnas extra (id_cita/id_usuario/notas).
+      if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+        rows = await dbQuery(
+          `
+          SELECT
+            f.id_factura,
+            f.id_paciente,
+            f.monto_total,
+            f.fecha_emision,
+            p.id_pago,
+            p.monto AS pago_monto,
+            p.fecha_pago,
+            p.metodo_pago
+          FROM facturacion f
+          LEFT JOIN pagos p ON p.id_factura = f.id_factura
+          WHERE f.id_paciente = ?
+          ORDER BY f.id_factura DESC, p.id_pago DESC
+          `,
+          [idPaciente]
+        );
+      } else {
+        throw e;
+      }
+    }
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    if (err?.status) return res.status(err.status).json({ message: err.message });
+    if (err && err.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        message:
+          'Faltan tablas pagos/facturacion en MySQL. Importa los scripts hospital_db_facturacion.sql y hospital_db_pagos.sql (o el dump completo) en tu base.'
+      });
+    }
+    res.status(500).json({ message: 'Error de base de datos (pagos por paciente)' });
   }
 });
 

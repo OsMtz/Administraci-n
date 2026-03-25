@@ -16,6 +16,7 @@ import ExpedientesAlmacenados from './pages/expedientes,almacenados';
 import ListaExpedientes from './pages/ListaExpedientes';
 import Login from './pages/Login';
 import Pacientes from './pages/Pacientes';
+import PagosSecretario from './pages/pagos,secretario';
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
               <Route path="/pacientes" element={<Pacientes />} />
               <Route path="/expedientes" element={<ListaExpedientes />} />
               <Route path="/expediente/:id" element={<Expediente />} />
+              <Route path="/pagos" element={<PagosSecretario />} />
               <Route path="/expedientes/almacenados/:id" element={<ExpedientesAlmacenados />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/expedientes-admin" element={<ExpedientesAdmin />} />
